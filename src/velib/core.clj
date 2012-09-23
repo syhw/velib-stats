@@ -71,8 +71,9 @@
 
 (defn update-station
   " Takes a station number and does the GET + updating "
-  [number]
-  (let [station-xml (get-station-body number)
+  [station]
+  (let [number (:number station)
+        station-xml (get-station-body number)
         available (get-station-attrib station-xml :available)
         free (get-station-attrib station-xml :available)
         updated (get-station-attrib station-xml :updated)]
@@ -81,7 +82,7 @@
 
 (defn -main [& args]
   " In case we don't have the cartography, go fetch it from the Velib API "
-  ; TODO update it everytime to get updated stations
+  ; update it everytime to get updated stations
   ;(if (not (.exists (File. cartography-file)))
   (with-open [wrtr (writer cartography-file)]
     (.write wrtr ((http/get cartography-url) :body)))
@@ -96,7 +97,16 @@
   " In case we don't have all the stations, update the stations map "
   (for [x (xml-seq 
             (parse (File. cartography-file)))
-        :when (= :marker (:tag x))]
+        :when (= :marker (:tag x))] 
     (if (not= ((x :attrs) :number) nil) 
-      (http/get (str station-url x)))))
+      (prn x)))
+  (map #(prn %) 
+       (filter #(not= ((% :attrs) :number) nil)
+               (filter #(= :marker (:tag %))
+                           (xml-seq (parse (File. cartography-file))))))
+      ;(update-station (get stations x))))
+
+  " Serialize stations back "
+  
+  )
 
