@@ -34,19 +34,22 @@
 
 (defn get-station-body
   [number]
-  ((http/get (str station-url number)) :body))
+  ((http/get (str station-url number) 
+             {:socket-timeout 2000, :conn-timeout 2000}) :body))
 
 (defn update-station
   " Takes a station dictionary and does the GET + updating "
   [station]
-  (let [number (:number station)
-        station-xml (get-station-body number)
-        available (get-station-attrib station-xml :available)
-        free (get-station-attrib station-xml :available)
-        updated (get-station-attrib station-xml :updated)]
-
-
-    ))
+  (let [station-xml (get-struct-map (get-station-body (:number station)))
+        available (Integer/parseInt (first (get-station-attrib station-xml :available)))
+        free (Integer/parseInt (first (get-station-attrib station-xml :available)))
+        updated (Integer/parseInt (first (get-station-attrib station-xml :updated)))]
+    (if (> updated (:updated station))
+      {:number (:number station),
+       :updated updated,
+       :polls (conj (:polls station) 
+                    {:timestamp updated, :available available, :free free})}
+      station)))
 
 (defn read-station
   " Returns the stations hash-map (either empty or to previous value) "
@@ -54,9 +57,9 @@
   (if (.exists (File. station-file))
     (deserialize-read (str station-file number))
     {:number number,
-     :lastupdated 0,
-     :free {:weekday {}, :weekend {}},
-     :available {:weekday {}, :weekend {}}}))
+     :updated 0,
+     :polls '()})) 
+  ; polls is a list of maps {:timestamp TS, :available NUMBER, :free NUMBER}
 
 (defn write-station
   " Write/serialize the given station hash-map "
