@@ -11,17 +11,15 @@
 (ns velib.core
   (:gen-class))
 
-
 (use 'clojure.java.io)
 (use 'clojure.xml)
 (require '[clojure.zip :as zip])
 (require '[clj-http.client :as http])
 (import '(java.io File))
-(import '(java.io ByteArrayInputStream))
 
 (defn get-struct-map [xml]
   " Transforms the xml String into an InputStream and parse it (XML) "
-  (let [stream (ByteArrayInputStream. (.getBytes (.trim xml)))]
+  (let [stream (java.io.ByteArrayInputStream. (.getBytes (.trim xml)))]
     (parse stream)))
 
 (defn get-station-attrib
@@ -30,7 +28,7 @@
 
 (def cartography-file "data/cartography")
 (def cartography-url "http://www.velib.paris.fr/service/carto")
-(def stations-file "data/stations")
+(def station-file "data/station-")
 (def station-url "http://www.velib.paris.fr/service/stationdetails/paris/")
 
 (defn serializable? 
@@ -49,8 +47,8 @@
 (defn serialize-write
   " Serializes value, writing in file 'filename' "
   [v filename]
-  (with-open [wrtr (writer filename)]
-    (.write wrtr (serialize v))))
+  (with-open [out (java.io.FileOutputStream. filename)]
+    (.write out (byte-array (serialize v)))))
 
 (defn deserialize 
   "Accepts a byte array, returns deserialized value"
@@ -78,35 +76,35 @@
         free (get-station-attrib station-xml :available)
         updated (get-station-attrib station-xml :updated)]
 
+
     ))
+
+(defn read-station
+  " Returns the stations hash-map (either empty or to previous value) "
+  [number]
+  (if (.exists (File. station-file))
+    (deserialize-read (str station-file number))
+    {:number number,
+     :free {:weekday {}, :weekend {}},
+     :available {:weekday {}, :weekend {}}}))
+
+(defn write-station
+  " Write/serialize the given station hash-map "
+  [station]
+  (serialize-write station (str station-file (station :number))))
 
 (defn -main [& args]
   " In case we don't have the cartography, go fetch it from the Velib API "
-  ; update it everytime to get updated stations
   ;(if (not (.exists (File. cartography-file)))
+  ; above commented => update it everytime to get updated stations
   (with-open [wrtr (writer cartography-file)]
     (.write wrtr ((http/get cartography-url) :body)))
   ;)
 
-  " Initialize the stations hash-map (either empty or to previous value) "
-  (def stations (ref {}))
-  (if (.exists (File. stations-file))
-    (def stations (deserialize-read stations-file)))
-
   " For each station in the cartography, get its status and update it "
   " In case we don't have all the stations, update the stations map "
-  (for [x (xml-seq 
-            (parse (File. cartography-file)))
-        :when (= :marker (:tag x))] 
-    (if (not= ((x :attrs) :number) nil) 
-      (prn x)))
-  (map #(prn %) 
+  (pmap #(write-station (update-station (read-station ((% :attrs) :number))))
        (filter #(not= ((% :attrs) :number) nil)
                (filter #(= :marker (:tag %))
-                           (xml-seq (parse (File. cartography-file))))))
-      ;(update-station (get stations x))))
-
-  " Serialize stations back "
-  
-  )
+                           (xml-seq (parse (File. cartography-file)))))))
 
