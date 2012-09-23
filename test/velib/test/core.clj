@@ -3,8 +3,8 @@
   (:use [clojure.test]))
 
 (deftest serialization-test
-         (let [tmpdict (read-station "42424242")]
+         (let [tmpdict (read-station "test-serialize")]
            (write-station tmpdict)
-           (if (= tmpdict (read-station "42424242"))
+           (if (= tmpdict (read-station "test-serialize"))
              (is true "serialization is ok")
              (is false "not the same data once unserialized"))))
