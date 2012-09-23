@@ -1,0 +1,15 @@
+# velib
+
+A program that polls the velib API to do statistics about free spots and 
+available bikes. Stocks it in simple serialized datastructs.
+
+## Usage
+
+use lein :)
+
+## License
+
+Copyright (C) 2012 Gabriel Synnaeve
+
+Distributed under the Eclipse Public License, the same as Clojure.
+
