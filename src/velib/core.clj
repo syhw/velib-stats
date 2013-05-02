@@ -53,8 +53,10 @@
   " Get updates on stations, wrapping clj-http + timouts "
   [number]
   (try
-    ((http/get (str station-url number) 
-               {:socket-timeout 2000, :conn-timeout 2000}) :body)
+    (do 
+      (. Thread (sleep 2000))
+      ((http/get (str station-url number) 
+               {:socket-timeout 2000, :conn-timeout 2000}) :body))
     (catch Exception e (prn (str "Couldn't get station: " number)))))
 
 (defn is-weekend?
@@ -82,12 +84,14 @@
   (for [avfree '(:available :free)]
     (for [weekend '(false, true)]
       (for [hour (range 0 24)]
+        (do
+          (prn (str "Will write to redis: " "station:" number avfree ":" hour))
         (write-redis number avfree weekend hour (average 
           (map #(avfree %) 
                (take maxn 
                      (filter #(and (= weekend (is-weekend? (:timestamp %)))
                                     (= (.getHours (java.sql.Timestamp. (* 1000 (:timestamp %)))) hour)) 
-                     tsl)))))))))
+                     tsl))))))))))
 
 ;(update-statistics 42424242 '({:timestamp 666666999999 :available 6 :free 9}) max-rolling-average-n)
 
@@ -104,6 +108,7 @@
                             {:timestamp updated, :available available, :free free})
             number (:number station)]
         (do
+          (prn (str "I'm going to update stats for: " number))
           (update-statistics number new-polls max-rolling-average-n))
           {:number number,
            :updated updated,
@@ -127,16 +132,17 @@
 
 (defn -main [& args]
   " In case we don't have the cartography, go fetch it from the Velib API "
-  ;(if (not (.exists (File. cartography-file)))
-  ; above commented => update it everytime to get updated stations
-  (with-open [wrtr (writer cartography-file)]
-    (.write wrtr ((http/get cartography-url) :body)))
-  ;)
+  (if (not (.exists (File. cartography-file)))
+    ; above commented => update it everytime to get updated stations
+    (with-open [wrtr (writer cartography-file)]
+      (.write wrtr ((http/get cartography-url) :body)))
+  )
 
   " For each station in the cartography, get its status and update it "
   " In case we don't have all the stations, update the stations map "
-  (pmap #(write-station (update-station-full (read-station ((% :attrs) :number))))
-       (filter #(not= ((% :attrs) :number) nil)
-               (filter #(= :marker (:tag %))
-                           (xml-seq (parse (File. cartography-file)))))))
+  (write-station (update-station-full (read-station 9113))))
+;  (pmap #(write-station (update-station-full (read-station ((% :attrs) :number))))
+;       (filter #(not= ((% :attrs) :number) nil)
+;               (filter #(= :marker (:tag %))
+;                           (xml-seq (parse (File. cartography-file)))))))
 
